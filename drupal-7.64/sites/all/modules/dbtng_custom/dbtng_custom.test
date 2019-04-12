@@ -1,0 +1,79 @@
+<?php
+
+class DBTNGCustomUnitTestCase extends DrupalWebTestCase{
+
+
+    public static function getInfo()
+    {
+        return array(
+            'name' => 'DBTNG custom unit and UI tests',
+            'description' => 'various unit tests on dbtng custom module.',
+            'group' => 'Custom'
+        );
+    }
+
+
+    public function setUp(){
+        parent::setUp('dbtng_custom');
+    }
+
+    public function testInstall(){
+        $result = dbtng_custom_entry_load();
+        $this->assertEqual(
+            count($result),
+            2,
+            'Two Entries in the Table'
+        );
+    }
+
+
+      public function testUI() {
+
+        $this->drupalGet('drupal-7.64/sites/all/modules/dbtng_custom');
+        $this->assertPattern("/John[td\/<>\w]+Doe/", "Text 'John Doe' found in table");
+
+
+        $this->drupalPost('drupal-7.64/sites/all/modules/dbtng_custom/add',
+          array(
+            'name'  => 'Some',
+            'jobs' => 'Anonymous',
+            'age' => 33,
+          ),
+          t('Add')
+        );
+
+        $this->drupalGet('drupal-7.64/sites/all/modules/dbtng_custom');
+        $this->assertPattern("/Some[td\/<>\w]+Anonymous/", "Text 'Some Anonymous' found in table");
+
+
+        $result = dbtng_custom_entry_load(array('jobs' => 'Anonymous'));
+        $this->drupalGet("drupal-7.64/sites/all/modules/dbtng_custom");
+        $this->assertEqual(
+          count($result),
+          1,
+          'Found one entry in the table with jobs = "Anonymous".'
+        );
+        $entry = $result[0];
+        unset($entry->uid);
+        $entry->name = 'NewFirstName';
+        $this->drupalPost('drupal-7.64/sites/all/modules/dbtng_custom/update', (array) $entry, t('Update'));
+        // Now find the new entry.
+        $this->drupalGet('drupal-7.64/sites/all/modules/dbtng_custom/dbtng');
+        $this->assertPattern("/NewFirstName[td\/<>\w]+Anonymous/", "Text 'NewFirstName Anonymous' found in table");
+
+
+        $this->drupalGet('drupal-7.64/sites/all/modules/dbtng_custom/advanced');
+        $rows = $this->xpath("//*[@id='block-system-main']/div/table[1]/tbody/tr");
+        $this->assertEqual(count($rows), 1, "One row found in advanced view");
+        $this->assertFieldByXPath("//*[@id='block-system-main']/div/table[1]/tbody/tr/td[4]", "Roe", "Name 'Roe' Exists in advanced list");
+      }
+
+
+
+
+
+
+
+
+
+}
