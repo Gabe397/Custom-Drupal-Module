@@ -272,7 +272,30 @@ function dbtng_custom_form_update($form, &$form_state) {
     return $form;
 }
 
+function dbtng_custom_form_update_callback($form, $form_state) {
+    $entry = $form_state['entries'][$form_state['values']['pid']];
 
+    foreach (array('name', 'surname', 'age') as $item) {
+        $form[$item]['#value'] = $entry->$item;
+    }
+    return $form;
+}
+
+
+function dbtng_custom_form_update_submit($form, &$form_state) {
+    global $user;
+
+    $entry = array(
+        'pid' => $form_state['values']['pid'],
+        'name' => $form_state['values']['name'],
+        'surname' => $form_state['values']['surname'],
+        'age' => $form_state['values']['age'],
+        'uid' => $user->uid,
+    );
+    $count = dbtng_custom_entry_update($entry);
+    drupal_set_message(t("Updated entry @entry (@count row updated)",
+        array('@count' => $count, '@entry' => print_r($entry, TRUE))));
+}
 
 
 
