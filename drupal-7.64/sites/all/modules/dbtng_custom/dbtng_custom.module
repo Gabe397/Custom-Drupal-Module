@@ -22,7 +22,6 @@ function dbtng_custom_entry_insert($entry) {
 
 function dbtng_custom_entry_update($entry) {
     try {
-        // db_update()...->execute() returns the number of rows updated.
         $count = db_update('dbtng_custom')
             ->fields($entry)
             ->condition('pid', $entry['pid'])
@@ -44,16 +43,239 @@ function dbtng_custom_entry_delete($entry) {
 
 
 function dbtng_custom_entry_load($entry = array()) {
-    // Read all fields from the dbtng_example table.
     $select = db_select('dbtng_custom', 'custom');
     $select->fields('custom');
 
-    // Add each field and value as a condition to this query.
     foreach ($entry as $field => $value) {
         $select->condition($field, $value);
     }
-    // Return the result in object format.
+
     return $select->execute()->fetchAll();
 }
+
+function dbtng_custom_advanced_list() {
+    $output = '';
+
+    $select = db_select('dbtng_custom', 'e');
+
+    $select->join('users', 'u', 'e.uid = u.uid');
+
+    $select->addField('e', 'pid');
+    $select->addField('u', 'name', 'username');
+    $select->addField('e', 'name');
+    $select->addField('e', 'surname');
+    $select->addField('e', 'age');
+
+    $select->condition('e.name', 'John');
+
+    $select->condition('e.age', 18, '>');
+
+    $select->range(0, 50);
+
+    $entries = $select->execute()->fetchAll(PDO::FETCH_ASSOC);
+    if (!empty($entries)) {
+        $rows = array();
+        foreach ($entries as $entry) {
+
+            $rows[] = array_map('check_plain', $entry);
+        }
+        $header = array(t('Id'), t('Created by'), t('Name'), t('surname'), t('Age'));
+        $output .= theme('table', array('header' => $header, 'rows' => $rows));
+    }
+    else {
+        drupal_set_message(t('No entries meet the filter criteria (Name = "John" and Age > 18).'));
+    }
+    return $output;
+}
+
+function dbtng_custom_help($path)
+{
+    $output = '';
+    switch ($path) {
+        case 'examples/dbtng':
+            $output = t('Generate a list of all entries in the database. There is no filter in the query.');
+            break;
+
+        case 'examples/dbtng/advanced':
+            $output = t('A more complex list of entries in the database.') . ' ';
+            $output .= t('Only the entries with name = "John" and age older than 18 years are shown, the username of the person who created the entry is also shown.');
+            break;
+
+        case 'examples/dbtng/update':
+            $output = t('Demonstrates a database update operation.');
+            break;
+
+        case 'examples/dbtng/add':
+            $output = t('Add an entry to the dbtng_example table.');
+            break;
+    }
+    return $output;
+}
+
+function dbtng_custom_menu() {
+    $items = array();
+
+    $items['examples/dbtng'] = array(
+        'title' => 'DBTNG Custom',
+        'page callback' => 'dbtng_custom_list',
+        'access callback' => TRUE,
+    );
+    $items['examples/dbtng/list'] = array(
+        'title' => 'List',
+        'type' => MENU_DEFAULT_LOCAL_TASK,
+        'weight' => -10,
+    );
+    $items['examples/dbtng/add'] = array(
+        'title' => 'Add entry',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('dbtng_custom_form_add'),
+        'access callback' => TRUE,
+        'type' => MENU_LOCAL_TASK,
+        'weight' => -9,
+    );
+    $items['examples/dbtng/update'] = array(
+        'title' => 'Update entry',
+        'page callback' => 'drupal_get_form',
+        'page arguments' => array('dbtng_custom_form_update'),
+        'type' => MENU_LOCAL_TASK,
+        'access callback' => TRUE,
+        'weight' => -5,
+    );
+    $items['examples/dbtng/advanced'] = array(
+        'title' => 'Advanced list',
+        'page callback' => 'dbtng_custom_advanced_list',
+        'access callback' => TRUE,
+        'type' => MENU_LOCAL_TASK,
+    );
+
+    return $items;
+}
+
+function dbtng_custom_list() {
+    $output = '';
+
+    // Get all entries in the dbtng_example table.
+    if ($entries = dbtng_custom_entry_load()) {
+        $rows = array();
+        foreach ($entries as $entry) {
+            // Sanitize the data before handing it off to the theme layer.
+            $rows[] = array_map('check_plain', (array) $entry);
+        }
+        // Make a table for them.
+        $header = array(t('Id'), t('uid'), t('Name'), t('surname'), t('Age'));
+        $output .= theme('table', array('header' => $header, 'rows' => $rows));
+    }
+    else {
+        drupal_set_message(t('No entries have been added yet.'));
+    }
+    return $output;
+}
+
+
+function dbtng_custom_form_add($form, &$form_state) {
+    $form = array();
+
+    $form['add'] = array(
+        '#type'  => 'fieldset',
+        '#title' => t('Add a person entry'),
+    );
+    $form['add']['name'] = array(
+        '#type'  => 'textfield',
+        '#title' => t('Name'),
+        '#size'  => 15,
+    );
+    $form['add']['surname'] = array(
+        '#type'  => 'textfield',
+        '#title' => t('surname'),
+        '#size'  => 15,
+    );
+    $form['add']['age'] = array(
+        '#type'  => 'textfield',
+        '#title' => t('Age'),
+        '#size'  => 5,
+        '#description' => t("Values greater than 127 will cause an exception. Try it - it's a great example why exception handling is needed with DTBNG."),
+    );
+    $form['add']['submit'] = array(
+        '#type'  => 'submit',
+        '#value' => t('Add'),
+    );
+
+    return $form;
+}
+
+function dbtng_custom_form_update($form, &$form_state) {
+    $form = array(
+        '#prefix' => '<div id="updateform">',
+        '#suffix' => '</div>',
+    );
+
+    $entries = dbtng_custom_entry_load();
+    $keyed_entries = array();
+    if (empty($entries)) {
+        $form['no_values'] = array(
+            '#value' => t("No entries exist in the table dbtng_example table."),
+        );
+        return $form;
+    }
+
+    foreach ($entries as $entry) {
+        $options[$entry->pid] = t("@pid: @name @surname (@age)",
+            array(
+                '@pid' => $entry->pid,
+                '@name' => $entry->name,
+                '@surname' => $entry->surname,
+                '@age' => $entry->age,
+            )
+        );
+        $keyed_entries[$entry->pid] = $entry;
+    }
+    $default_entry = !empty($form_state['values']['pid']) ? $keyed_entries[$form_state['values']['pid']] : $entries[0];
+
+    $form_state['entries'] = $keyed_entries;
+
+    $form['pid'] = array(
+        '#type' => 'select',
+        '#options' => $options,
+        '#title' => t('Choose entry to update'),
+        '#default_value' => $default_entry->pid,
+        '#ajax' => array(
+            'wrapper' => 'updateform',
+            'callback' => 'dbtng_custom_form_update_callback',
+        ),
+    );
+
+    $form['name'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Updated first name'),
+        '#size' => 15,
+        '#default_value' => $default_entry->name,
+    );
+
+    $form['surname'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Updated last name'),
+        '#size' => 15,
+        '#default_value' => $default_entry->surname,
+    );
+    $form['age'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Updated age'),
+        '#size' => 4,
+        '#default_value' => $default_entry->age,
+        '#description' => t("Values greater than 127 will cause an exception"),
+    );
+
+    $form['submit'] = array(
+        '#type' => 'submit',
+        '#value' => t('Update'),
+    );
+    return $form;
+}
+
+
+
+
+
+
 
 
