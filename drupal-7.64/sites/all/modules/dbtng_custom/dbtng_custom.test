@@ -57,7 +57,7 @@ class DBTNGCustomUnitTestCase extends DrupalWebTestCase{
         unset($entry->uid);
         $entry->name = 'NewFirstName';
         $this->drupalPost('drupal-7.64/sites/all/modules/dbtng_custom/update', (array) $entry, t('Update'));
-        // Now find the new entry.
+
         $this->drupalGet('drupal-7.64/sites/all/modules/dbtng_custom/dbtng');
         $this->assertPattern("/NewFirstName[td\/<>\w]+Anonymous/", "Text 'NewFirstName Anonymous' found in table");
 
@@ -69,11 +69,102 @@ class DBTNGCustomUnitTestCase extends DrupalWebTestCase{
       }
 
 
+       public function testAPIExamples() {
+
+          $entry = array(
+            'name' => 'James',
+            'jobs' => 'Doe',
+            'age' => 23,
+          );
+          dbtng_custom_entry_insert($entry);
+
+
+          $entry = array(
+            'name' => 'Jane',
+            'jobs' => 'NotDoe',
+            'age' => 19,
+          );
+          dbtng_custom_entry_insert($entry);
+
+
+          $result = dbtng_custom_entry_load();
+          $this->assertEqual(
+            count($result),
+            4,
+            'Found a total of four entries in the table after creating two additional entries.'
+          );
+
+
+          $result = dbtng_custom_entry_load(array('jobs' => 'Doe'));
+          $this->assertEqual(
+            count($result),
+            2,
+            'Found two entries in the table with jobs = "Doe".'
+          );
+
+
+          $result = dbtng_custom_entry_load(array('jobs' => 'NotDoe'));
+          $this->assertEqual(
+            count($result),
+            1,
+            'Found one entry in the table with jobs "NotDoe');
+
+
+          $entry = $result[0];
+          $entry->jobs = "NowDoe";
+          dbtng_custom_entry_update((array) $entry);
+
+          $result = dbtng_custom_entry_load(array('jobs' => 'NowDoe'));
+          $this->assertEqual(
+            count($result),
+            1,
+            "Found renamed 'NowDoe' jobs");
+
+
+          $result = dbtng_custom_entry_load(array('name' => 'John', 'jobs' => 'Doe'));
+          $this->assertEqual(
+            count($result),
+            1,
+            'Found one entry for John Doe.'
+          );
+
+          $entry = (array) end($result);
+
+          $entry['age'] = 45;
+
+          dbtng_custom_entry_update((array) $entry);
 
 
 
+          $result = dbtng_custom_entry_load(array('jobs' => 'NowDoe'));
+          $this->assertEqual(
+            count($result),
+            1,
+            'Found one entry with jobs = Nowdoe.'
+          );
 
 
+          $entry = (array) end($result);
+          $this->assertEqual(
+            $entry['name'],
+            'Jane',
+            'The name Jane is found in the entry'
+          );
+          $this->assertEqual(
+            $entry['jobs'],
+            'NowDoe',
+            'The jobs NowDoe is found in the entry'
+          );
 
 
+          dbtng_custom_entry_delete($entry);
+
+
+          $result = dbtng_custom_entry_load();
+          $this->assertEqual(
+            count($result),
+            3,
+            'Found only three records, a record was deleted.'
+          );
+        }
 }
